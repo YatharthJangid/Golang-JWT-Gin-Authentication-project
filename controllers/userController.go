@@ -31,7 +31,7 @@ func HashPassword(password string) string {
 }
 
 func VerifyPassword(userPassword string, providedPassword string) (bool, string) {
-	err := bcrypt.CompareHashAndPassword([]byte(providedPassword), []byte(userPassword))
+	err := bcrypt.CompareHashAndPassword([]byte(userPassword), []byte(providedPassword))
 	check := true
 	msg := ""
 
@@ -69,6 +69,7 @@ func Signup() gin.HandlerFunc {
 		if err != nil {
 			log.Panic(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while checking for the email"})
+			return
 		}
 
 		password := HashPassword(*user.Password)
@@ -78,6 +79,7 @@ func Signup() gin.HandlerFunc {
 		if err != nil {
 			log.Panic(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while checking for the phone number"})
+			return
 		}
 
 		if count > 0 {
