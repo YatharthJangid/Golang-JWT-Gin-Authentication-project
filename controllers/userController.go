@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -25,7 +24,7 @@ var validate = validator.New()
 func HashPassword(password string) string {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
 	if err != nil {
-		log.Panic(err)
+		return ""
 	}
 	return string(bytes)
 }
@@ -67,23 +66,31 @@ func Signup() gin.HandlerFunc {
 		count, err := userCollection.CountDocuments(ctx, bson.M{"email": user.Email})
 		defer cancel()
 		if err != nil {
-			log.Panic(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while checking for the email"})
 			return
 		}
 
 		password := HashPassword(*user.Password)
+		if password == "" {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "password could not be secured"})
+			return
+		}
 		user.Password = &password
+
+		if count > 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "this email already exists"})
+			return
+		}
 
 		count, err = userCollection.CountDocuments(ctx, bson.M{"phone": user.Phone})
 		if err != nil {
-			log.Panic(err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while checking for the phone number"})
 			return
 		}
 
 		if count > 0 {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "this email or phone number already exists"})
+			c.JSON(http.StatusConflict, gin.H{"error": "this phone number already exists"})
+			return
 		}
 
 		user.Created_at, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
@@ -136,6 +143,7 @@ func Login() gin.HandlerFunc {
 
 		if foundUser.Email == nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "user not found"})
+			return
 		}
 		token, refreshToken, _ := helper.GenerateAllTokens(*foundUser.Email, *foundUser.First_name, *foundUser.Last_name, *foundUser.User_type, foundUser.User_id)
 		helper.UpdateAllTokens(token, refreshToken, foundUser.User_id)
@@ -151,16 +159,16 @@ func Login() gin.HandlerFunc {
 
 func GetUsers() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if err := helper.CheckUserType(c, "ADMIN"); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
 		userCollection, err := database.OpenCollection("user")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "database connection is not available"})
 			return
 		}
 
+		if err := helper.CheckUserType(c, "ADMIN"); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 
 		recordPerPage, err := strconv.Atoi(c.Query("recordPerPage"))
@@ -173,7 +181,12 @@ func GetUsers() gin.HandlerFunc {
 		}
 
 		startIndex := (page - 1) * recordPerPage
-		startIndex, err = strconv.Atoi(c.Query("startIndex"))
+		if queryStartIndex := c.Query("startIndex"); queryStartIndex != "" {
+			startIndex, err = strconv.Atoi(queryStartIndex)
+			if err != nil || startIndex < 0 {
+				startIndex = (page - 1) * recordPerPage
+			}
+		}
 
 		matchStage := bson.D{{"$match", bson.D{{}}}}
 		groupStage := bson.D{{"$group", bson.D{
@@ -188,10 +201,16 @@ func GetUsers() gin.HandlerFunc {
 		defer cancel()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while listing user items"})
+			return
 		}
 		var allusers []bson.M
 		if err = result.All(ctx, &allusers); err != nil {
-			log.Fatal(err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while decoding user items"})
+			return
+		}
+		if len(allusers) == 0 {
+			c.JSON(http.StatusOK, gin.H{"total_count": 0, "user_items": []interface{}{}})
+			return
 		}
 		c.JSON(http.StatusOK, allusers[0])
 	}
@@ -199,18 +218,18 @@ func GetUsers() gin.HandlerFunc {
 
 func GetUser() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userId := c.Param("user_id")
-
-		if err := helper.MatchUserTypeToUid(c, userId); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
 		userCollection, err := database.OpenCollection("user")
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "database connection is not available"})
 			return
 		}
 
+		userId := c.Param("user_id")
+
+		if err := helper.MatchUserTypeToUid(c, userId); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 
 		var user models.User
