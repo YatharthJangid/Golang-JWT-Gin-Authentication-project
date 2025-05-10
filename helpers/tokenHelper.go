@@ -2,8 +2,8 @@ package helper
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -23,9 +23,12 @@ type SignedDetails struct {
 	jwt.StandardClaims
 }
 
-var SECRET_KEY string = os.Getenv("SECRET_KEY")
-
 func GenerateAllTokens(email string, firstName string, lastName string, userType string, uid string) (signedToken string, signedRefreshToken string, err error) {
+	secretKey, err := secretKey()
+	if err != nil {
+		return "", "", err
+	}
+
 	claims := &SignedDetails{
 		Email:      email,
 		First_name: firstName,
@@ -43,23 +46,30 @@ func GenerateAllTokens(email string, firstName string, lastName string, userType
 		},
 	}
 
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(SECRET_KEY))
-	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString([]byte(SECRET_KEY))
-
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secretKey))
 	if err != nil {
-		log.Panic(err)
-		return
+		return "", "", err
+	}
+
+	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString([]byte(secretKey))
+	if err != nil {
+		return "", "", err
 	}
 
 	return token, refreshToken, err
 }
 
 func ValidateToken(signedToken string) (claims *SignedDetails, msg string) {
+	secretKey, err := secretKey()
+	if err != nil {
+		return nil, err.Error()
+	}
+
 	token, err := jwt.ParseWithClaims(
 		signedToken,
 		&SignedDetails{},
 		func(token *jwt.Token) (interface{}, error) {
-			return []byte(SECRET_KEY), nil
+			return []byte(secretKey), nil
 		},
 	)
 
@@ -71,13 +81,11 @@ func ValidateToken(signedToken string) (claims *SignedDetails, msg string) {
 	claims, ok := token.Claims.(*SignedDetails)
 	if !ok {
 		msg = fmt.Sprintf("the token is invalid")
-		msg = err.Error()
 		return
 	}
 
 	if claims.ExpiresAt < time.Now().Local().Unix() {
 		msg = fmt.Sprintf("token is expired")
-		msg = err.Error()
 		return
 	}
 	return claims, msg
@@ -115,8 +123,16 @@ func UpdateAllTokens(signedToken string, signedRefreshToken string, userId strin
 	defer cancel()
 
 	if err != nil {
-		log.Panic(err)
 		return
 	}
 	return
+}
+
+func secretKey() (string, error) {
+	key := os.Getenv("SECRET_KEY")
+	if key == "" {
+		return "", errors.New("SECRET_KEY is required")
+	}
+
+	return key, nil
 }

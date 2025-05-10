@@ -9,19 +9,22 @@ import(
 )
 
 func main(){
-	err := godotenv.Load(".env")
-
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	_ = godotenv.Load(".env")
 	port := os.Getenv("PORT")
 
 	if port==""{
-		port="8000"
+		port="10000"
 	}
 
-	router := gin.New()
-	router.Use(gin.Logger())
+	if os.Getenv("SECRET_KEY") == "" {
+		log.Fatal("SECRET_KEY is required")
+	}
+
+	if os.Getenv("MONGODB_URL") == "" {
+		log.Fatal("MONGODB_URL is required")
+	}
+
+	router := gin.Default()
 
 	routes.AuthRoutes(router)
 	routes.UserRoutes(router)
@@ -34,5 +37,5 @@ func main(){
 		c.JSON(200, gin.H{"success":"Access granted for api-2"})
 	})
 
-	router.Run(":" + port)
+	log.Fatal(router.Run(":" + port))
 }	

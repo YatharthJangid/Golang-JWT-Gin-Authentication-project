@@ -2,7 +2,9 @@ package database
 
 import (
 	"context"
+	"errors"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -10,13 +12,29 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+var (
+	client     *mongo.Client
+	clientErr  error
+	clientOnce sync.Once
+)
+
 func Connect() (*mongo.Client, error) {
-	_ = godotenv.Load(".env")
+	clientOnce.Do(func() {
+		_ = godotenv.Load(".env")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+		mongoURI := os.Getenv("MONGODB_URL")
+		if mongoURI == "" {
+			clientErr = errors.New("MONGODB_URL is required")
+			return
+		}
 
-	return mongo.Connect(ctx, options.Client().ApplyURI(os.Getenv("MONGODB_URL")))
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		client, clientErr = mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	})
+
+	return client, clientErr
 }
 
 func OpenCollection(collectionName string) (*mongo.Collection, error) {
@@ -25,5 +43,13 @@ func OpenCollection(collectionName string) (*mongo.Collection, error) {
 		return nil, err
 	}
 
-	return client.Database("cluster0").Collection(collectionName), nil
+	return client.Database(databaseName()).Collection(collectionName), nil
+}
+
+func databaseName() string {
+	if name := os.Getenv("DB_NAME"); name != "" {
+		return name
+	}
+
+	return "go_jwt_demo"
 }
