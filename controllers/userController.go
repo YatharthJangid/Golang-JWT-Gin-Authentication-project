@@ -97,7 +97,11 @@ func Signup() gin.HandlerFunc {
 		user.Updated_at, _ = time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
 		user.ID = primitive.NewObjectID()
 		user.User_id = user.ID.Hex()
-		token, refreshToken, _ := helper.GenerateAllTokens(*user.Email, *user.First_name, *user.Last_name, *user.User_type, user.User_id)
+		token, refreshToken, err := helper.GenerateAllTokens(*user.Email, *user.First_name, *user.Last_name, *user.User_type, user.User_id)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "tokens could not be generated"})
+			return
+		}
 		user.Token = &token
 		user.Refresh_token = &refreshToken
 
@@ -145,7 +149,11 @@ func Login() gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "user not found"})
 			return
 		}
-		token, refreshToken, _ := helper.GenerateAllTokens(*foundUser.Email, *foundUser.First_name, *foundUser.Last_name, *foundUser.User_type, foundUser.User_id)
+		token, refreshToken, err := helper.GenerateAllTokens(*foundUser.Email, *foundUser.First_name, *foundUser.Last_name, *foundUser.User_type, foundUser.User_id)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "tokens could not be generated"})
+			return
+		}
 		helper.UpdateAllTokens(token, refreshToken, foundUser.User_id)
 		err = userCollection.FindOne(ctx, bson.M{"user_id": foundUser.User_id}).Decode(&foundUser)
 
@@ -239,6 +247,29 @@ func GetUser() gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
+		c.JSON(http.StatusOK, user)
+	}
+}
+
+func GetProfile() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userCollection, err := database.OpenCollection("user")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "database connection is not available"})
+			return
+		}
+
+		userID := c.GetString("uid")
+		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
+
+		var user models.User
+		err = userCollection.FindOne(ctx, bson.M{"user_id": userID}).Decode(&user)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
+
 		c.JSON(http.StatusOK, user)
 	}
 }
