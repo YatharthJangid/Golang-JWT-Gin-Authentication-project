@@ -1,19 +1,20 @@
 package main
 
-import(
+import (
 	routes "github.com/akhil/golang-jwt-project/routes"
-	"os"
-	"log"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"log"
+	"os"
 )
 
-func main(){
+func main() {
 	_ = godotenv.Load(".env")
+
 	port := os.Getenv("PORT")
 
-	if port==""{
-		port="10000"
+	if port == "" {
+		port = "10000"
 	}
 
 	if os.Getenv("SECRET_KEY") == "" {
@@ -29,13 +30,27 @@ func main(){
 	routes.AuthRoutes(router)
 	routes.UserRoutes(router)
 
-	router.GET("/api-1", func(c *gin.Context){
-		c.JSON(200, gin.H{"success":"Access granted for api-1"})
+	router.GET("/", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "JWT auth demo is running",
+			"docs":    "POST /users/signup, POST /users/login, GET /users/me",
+		})
 	})
 
-	router.GET("/api-2", func(c *gin.Context){
-		c.JSON(200, gin.H{"success":"Access granted for api-2"})
+	router.GET("/healthz", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status":  "ok",
+			"service": "golang-jwt-demo",
+		})
+	})
+
+	router.GET("/api-1", func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": "Access granted for api-1"})
+	})
+
+	router.GET("/api-2", func(c *gin.Context) {
+		c.JSON(200, gin.H{"success": "Access granted for api-2"})
 	})
 
 	log.Fatal(router.Run(":" + port))
-}	
+}

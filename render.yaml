@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: golang-jwt-demo
+    env: go
+    plan: free
+    rootDir: .
+    buildCommand: go build -o app .
+    startCommand: ./app
+    autoDeploy: true
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: DB_NAME
+        value: go_jwt_demo
+      - key: MONGODB_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
