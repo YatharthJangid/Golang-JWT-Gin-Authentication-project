@@ -3,16 +3,15 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"net/http"
-	"strconv"
-	"time"
-
 	"github.com/akhil/golang-jwt-project/database"
 	helper "github.com/akhil/golang-jwt-project/helpers"
 	"github.com/akhil/golang-jwt-project/models"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"golang.org/x/crypto/bcrypt"
+	"net/http"
+	"strconv"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -42,6 +41,7 @@ func VerifyPassword(userPassword string, providedPassword string) (bool, string)
 }
 
 func Signup() gin.HandlerFunc {
+
 	return func(c *gin.Context) {
 		userCollection, err := database.OpenCollection("user")
 		if err != nil {
@@ -113,6 +113,7 @@ func Signup() gin.HandlerFunc {
 		}
 		c.JSON(http.StatusOK, resultInsertionNumber)
 	}
+
 }
 
 func Login() gin.HandlerFunc {
@@ -140,6 +141,7 @@ func Login() gin.HandlerFunc {
 		}
 
 		passwordIsValid, msg := VerifyPassword(*user.Password, *foundUser.Password)
+		defer cancel()
 		if passwordIsValid != true {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": msg})
 			return
@@ -201,11 +203,13 @@ func GetUsers() gin.HandlerFunc {
 			{"_id", bson.D{{"_id", "null"}}},
 			{"total_count", bson.D{{"$sum", 1}}},
 			{"data", bson.D{{"$push", "$$ROOT"}}}}}}
-		projectStage := bson.D{{"$project", bson.D{
-			{"_id", 0},
-			{"total_count", 1},
-			{"user_items", bson.D{{"$slice", []interface{}{"$data", startIndex, recordPerPage}}}}}}}
-		result, err := userCollection.Aggregate(ctx, mongo.Pipeline{matchStage, groupStage, projectStage})
+		projectStage := bson.D{
+			{"$project", bson.D{
+				{"_id", 0},
+				{"total_count", 1},
+				{"user_items", bson.D{{"$slice", []interface{}{"$data", startIndex, recordPerPage}}}}}}}
+		result, err := userCollection.Aggregate(ctx, mongo.Pipeline{
+			matchStage, groupStage, projectStage})
 		defer cancel()
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occured while listing user items"})

@@ -4,14 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"time"
-
 	"github.com/akhil/golang-jwt-project/database"
 	jwt "github.com/dgrijalva/jwt-go"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"os"
+	"time"
 )
 
 type SignedDetails struct {
@@ -104,8 +103,8 @@ func UpdateAllTokens(signedToken string, signedRefreshToken string, userId strin
 	updateObj = append(updateObj, bson.E{"token", signedToken})
 	updateObj = append(updateObj, bson.E{"refresh_token", signedRefreshToken})
 
-	updatedAt, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
-	updateObj = append(updateObj, bson.E{"updated_at", updatedAt})
+	Updated_at, _ := time.Parse(time.RFC3339, time.Now().Format(time.RFC3339))
+	updateObj = append(updateObj, bson.E{"updated_at", Updated_at})
 
 	upsert := true
 	filter := bson.M{"user_id": userId}
@@ -116,7 +115,9 @@ func UpdateAllTokens(signedToken string, signedRefreshToken string, userId strin
 	_, err = userCollection.UpdateOne(
 		ctx,
 		filter,
-		bson.D{{"$set", updateObj}},
+		bson.D{
+			{"$set", updateObj},
+		},
 		&opt,
 	)
 
