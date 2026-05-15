@@ -1,6 +1,6 @@
 # Golang JWT Gin Authentication Demo
 
-This project exposes a small JWT-based authentication API built with Gin and MongoDB. It is configured to run locally with `.env` and deploy as a Render web service.
+This project exposes a small JWT-based authentication API built with Gin and MongoDB. It is configured to run locally with `.env` and is deployed on Render for demo use.
 
 ## Demo Features
 
@@ -9,6 +9,13 @@ This project exposes a small JWT-based authentication API built with Gin and Mon
 - Protected endpoints for profile lookup and user listing
 - Health endpoint for deployment monitoring
 - Render blueprint file for one-click service setup
+
+## Live Demo
+
+This project is deployed on Render.
+
+- Base URL: add https://golang-jwt-demo-production.up.railway.app
+- Health check: `/healthz`
 
 ## Required Environment Variables
 
